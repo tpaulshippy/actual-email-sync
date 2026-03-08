@@ -1,0 +1,14 @@
+{
+  "watchers": [
+    {
+      "watch_dir": "~/email_logs",
+      "file_pattern": "\\.json$",
+      "scripts": [
+        {
+          "command": "/home/linuxbrew/.linuxbrew/bin/ruby /home/ubuntu/repos/finance/parse_and_insert_transactions.rb",
+          "args": ["{filepath}"]
+        }
+      ]
+    }
+  ]
+}

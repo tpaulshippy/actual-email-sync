@@ -1,24 +1,20 @@
 #!/home/linuxbrew/.linuxbrew/bin/ruby
 require 'json'
 require 'sqlite3'
-require 'listen'
 require 'base64'
 require 'date'
-require 'fileutils'
 require 'optparse'
 
 DEFAULT_CONFIG_PATH = File.expand_path('~/repos/finance/email_parsers.json')
 DEFAULT_DB_PATH = File.expand_path('~/repos/finance/spending.db')
-DEFAULT_EMAIL_LOGS_DIR = File.expand_path('~/email_logs')
 
 options = {
   config_path: DEFAULT_CONFIG_PATH,
-  db_path: DEFAULT_DB_PATH,
-  email_logs_dir: DEFAULT_EMAIL_LOGS_DIR
+  db_path: DEFAULT_DB_PATH
 }
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: #{$0} [options]"
+  opts.banner = "Usage: #{$0} [options] <email_file>"
 
   opts.on("-cPATH", "--config=PATH", "Path to config JSON file") do |path|
     options[:config_path] = path
@@ -28,24 +24,21 @@ OptionParser.new do |opts|
     options[:db_path] = path
   end
 
-  opts.on("-ePATH", "--emails=PATH", "Path to email logs directory") do |path|
-    options[:email_logs_dir] = path
-  end
-
   opts.on("-h", "--help", "Show this help message") do
     puts opts
     exit
-  end
-
-  # One-shot run: process existing logs and exit (no watcher)
-  opts.on("--once", "Process existing email logs once and exit") do
-    options[:once] = true
   end
 end.parse!
 
 CONFIG_PATH = options[:config_path]
 DB_PATH = options[:db_path]
-EMAIL_LOGS_DIR = options[:email_logs_dir]
+
+if ARGV.empty?
+  puts "Error: Email file path required as argument"
+  exit 1
+end
+
+EMAIL_FILE = ARGV[0]
 
 def load_config
   JSON.parse(File.read(CONFIG_PATH))
@@ -162,33 +155,6 @@ def process_email_file(filepath, db, parsers)
     end
 end
 
-def process_existing_files(db, parsers)
-  Dir.glob(File.join(EMAIL_LOGS_DIR, '*.json')).each do |filepath|
-    process_email_file(filepath, db, parsers)
-  end
-end
-
 parsers = load_config
 db = init_db
-process_existing_files(db, parsers)
-
-# If --once flag was passed, exit after processing
-if options[:once]
-  puts "Processed existing logs once."
-  exit
-end
-
-puts "Watching #{EMAIL_LOGS_DIR} for new emails..."
-
-listener = Listen.to(EMAIL_LOGS_DIR, only: /\.json$/) do |modified, added, removed|
-  (modified + added).each do |filepath|
-    sleep 1
-    process_email_file(filepath, db, parsers)
-  end
-end
-
-listener.start
-
-puts "Press Ctrl+C to stop..."
-
-sleep
+process_email_file(EMAIL_FILE, db, parsers)
