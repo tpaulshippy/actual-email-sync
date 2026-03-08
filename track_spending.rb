@@ -5,10 +5,42 @@ require 'listen'
 require 'base64'
 require 'date'
 require 'fileutils'
+require 'optparse'
 
-CONFIG_PATH = File.expand_path('~/repos/finance/email_parsers.json')
-DB_PATH = File.expand_path('~/repos/finance/spending.db')
-EMAIL_LOGS_DIR = File.expand_path('~/email_logs')
+DEFAULT_CONFIG_PATH = File.expand_path('~/repos/finance/email_parsers.json')
+DEFAULT_DB_PATH = File.expand_path('~/repos/finance/spending.db')
+DEFAULT_EMAIL_LOGS_DIR = File.expand_path('~/email_logs')
+
+options = {
+  config_path: DEFAULT_CONFIG_PATH,
+  db_path: DEFAULT_DB_PATH,
+  email_logs_dir: DEFAULT_EMAIL_LOGS_DIR
+}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0} [options]"
+
+  opts.on("-cPATH", "--config=PATH", "Path to config JSON file") do |path|
+    options[:config_path] = path
+  end
+
+  opts.on("-dPATH", "--db=PATH", "Path to SQLite database") do |path|
+    options[:db_path] = path
+  end
+
+  opts.on("-ePATH", "--emails=PATH", "Path to email logs directory") do |path|
+    options[:email_logs_dir] = path
+  end
+
+  opts.on("-h", "--help", "Show this help message") do
+    puts opts
+    exit
+  end
+end.parse!
+
+CONFIG_PATH = options[:config_path]
+DB_PATH = options[:db_path]
+EMAIL_LOGS_DIR = options[:email_logs_dir]
 
 def load_config
   JSON.parse(File.read(CONFIG_PATH))
