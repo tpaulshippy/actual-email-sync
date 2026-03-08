@@ -1,20 +1,18 @@
 const api = require('@actual-app/api');
-const fs = require('fs');
 
-const config = fs.readFileSync(process.env.HOME + '/shared_config', 'utf8');
-const serverURL = config.match(/ACTUAL_SERVER_URL=(.+)/)?.[1] || 'http://localhost:5006';
-const password = config.match(/ACTUAL_SERVER_PASSWORD=(.+)/)?.[1];
-const syncId = config.match(/ACTUAL_SERVER_SYNC_ID=(.+)/)?.[1];
+const serverURL = process.env.ACTUAL_SERVER_URL || 'http://localhost:5006';
+const password = process.env.ACTUAL_SERVER_PASSWORD;
+const syncId = process.env.ACTUAL_SERVER_SYNC_ID;
 
 async function main() {
   await api.init({
     dataDir: './actual-data',
-    serverURL: serverURL.trim(),
-    password: password.trim(),
+    serverURL,
+    password,
     verbose: false,
   });
 
-  await api.downloadBudget(syncId.trim());
+  await api.downloadBudget(syncId);
   
   const accounts = await api.getAccounts();
   console.log('=== Accounts ===');
