@@ -6,6 +6,8 @@
     "merchant_pattern": "charged\\s*\\$\\d+\\.\\d+\\s*at\\s+(.+?)\\.",
     "amount_pattern": "\\$(\\d+\\.\\d+)",
     "card_pattern": "ending\\s*in\\s*(\\d{4})",
-    "transaction_type": "authorization"
+    "transaction_type": "authorization",
+    "account": "36990e5f-dcbb-4b2a-949a-b0c3a0335a41",
+    "is_credit": true
   }
 ]

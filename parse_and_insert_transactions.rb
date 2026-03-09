@@ -57,6 +57,7 @@ def init_db
       email_subject TEXT,
       email_file TEXT,
       transaction_type TEXT DEFAULT 'posted',
+      account TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   SQL
@@ -97,12 +98,14 @@ def parse_email(body, parser)
   end
 
   if amount && merchant
+    amount = -amount if parser['is_credit']
     {
       amount: amount,
       merchant: merchant,
       card_last_four: card_last_four,
       date: Date.today.strftime('%Y-%m-%d'),
-      transaction_type: parser['transaction_type'] || 'posted'
+      transaction_type: parser['transaction_type'] || 'posted',
+      account: parser['account']
     }
   else
     nil
@@ -144,10 +147,10 @@ def process_email_file(filepath, db, parsers)
 
              if existing.nil?
                db.execute(
-                 'INSERT INTO transactions (date, merchant, amount, card_last_four, source, email_subject, email_file, transaction_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                 [parsed[:date], parsed[:merchant], parsed[:amount], parsed[:card_last_four], parser['name'], subject, File.basename(filepath), parsed[:transaction_type]]
+                 'INSERT INTO transactions (date, merchant, amount, card_last_four, source, email_subject, email_file, transaction_type, account) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                 [parsed[:date], parsed[:merchant], parsed[:amount], parsed[:card_last_four], parser['name'], subject, File.basename(filepath), parsed[:transaction_type], parsed[:account]]
                )
-               puts "Added: #{parsed[:date]} - #{parsed[:merchant]} $#{parsed[:amount]} (#{parser['name']}) - #{parsed[:transaction_type]}"
+               puts "Added: #{parsed[:date]} - #{parsed[:merchant]} $#{parsed[:amount]} (#{parser['name']}) - #{parsed[:transaction_type]} - #{parsed[:account]}"
              else
                puts "Skipped (duplicate): #{parsed[:merchant]} $#{parsed[:amount]}"
              end
