@@ -43,7 +43,7 @@ async function main() {
       const result = await api.addTransactions(actualAccountId, [{
         date: tx.date,
         amount: amountCents,
-        payee_name: tx.merchant,
+        payee_name: String(tx.merchant),
         notes: `Source: ${tx.source} (${tx.email_subject})`,
       }]);
 
