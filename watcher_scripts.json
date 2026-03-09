@@ -7,6 +7,10 @@
         {
           "command": "/home/linuxbrew/.linuxbrew/bin/ruby /home/ubuntu/repos/finance/parse_and_insert_transactions.rb",
           "args": ["{filepath}"]
+        },
+        {
+          "command": "node /home/ubuntu/repos/finance/post_to_actual.js",
+          "args": []
         }
       ]
     }

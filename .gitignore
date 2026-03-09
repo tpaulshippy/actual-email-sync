@@ -1,2 +1,4 @@
+node_modules
 email_logs/
 spending.db
+actual-data/
