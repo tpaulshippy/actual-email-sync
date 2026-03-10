@@ -55,6 +55,7 @@ def init_db
       transaction_type TEXT DEFAULT 'posted',
       account TEXT,
       matched_auth_id INTEGER,
+      matched_posted_id INTEGER,
       actual_posted INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
@@ -189,13 +190,14 @@ def process_email_file(filepath, db, parsers)
                 unmatched_reason = nil
                 if parsed[:transaction_type] == 'withdrawal' && parsed[:card_last_four]
                   auth_match = db.get_first_row(
-                    'SELECT id, merchant FROM transactions WHERE transaction_type = ? AND amount = ? AND card_last_four = ? AND matched_auth_id IS NULL ORDER BY date DESC, id DESC LIMIT 1',
+                    'SELECT id, merchant FROM transactions WHERE transaction_type = ? AND amount = ? AND card_last_four = ? AND matched_posted_id IS NULL ORDER BY date DESC, id DESC LIMIT 1',
                     ['authorization', parsed[:amount], parsed[:card_last_four]]
                   )
                   if auth_match
                     matched_auth_id = auth_match.is_a?(Hash) ? auth_match['id'] : auth_match[0]
                     merchant_name = auth_match.is_a?(Hash) ? auth_match['merchant'] : auth_match[1]
                     parsed[:merchant] = merchant_name
+                    db.execute('UPDATE transactions SET matched_posted_id = ? WHERE id = ?', [0, matched_auth_id])
                     puts "Matched to authorization ##{matched_auth_id}: #{merchant_name}"
                   else
                     unmatched_reason = 'no_matching_authorization'
