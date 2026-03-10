@@ -143,7 +143,7 @@ def parse_email(body, parser)
       amount: amount,
       merchant: merchant || 'Unknown',
       card_last_four: card_last_four,
-      date: transaction_date,
+      transaction_date: transaction_date,
       transaction_type: parser[:transaction_type] || 'posted',
       account: parser[:account]
     }
@@ -182,7 +182,7 @@ def process_email_file(filepath, db, parsers)
           if parsed
             existing = db.get_first_row(
               'SELECT 1 FROM transactions WHERE date = ? AND merchant = ? AND amount = ?',
-              [parsed[:date], parsed[:merchant], parsed[:amount]]
+              [parsed[:transaction_date], parsed[:merchant], parsed[:amount]]
             )
 
              if existing.nil?
@@ -207,7 +207,7 @@ def process_email_file(filepath, db, parsers)
 
                 db.execute(
                   'INSERT INTO transactions (date, merchant, amount, card_last_four, source, email_subject, email_file, transaction_type, account, matched_auth_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  [parsed[:date], parsed[:merchant], parsed[:amount], parsed[:card_last_four], parser['name'], subject, File.basename(filepath), parsed[:transaction_type], parsed[:account], matched_auth_id]
+                  [parsed[:transaction_date], parsed[:merchant], parsed[:amount], parsed[:card_last_four], parser['name'], subject, File.basename(filepath), parsed[:transaction_type], parsed[:account], matched_auth_id]
                 )
                 
                 if unmatched_reason
@@ -218,7 +218,7 @@ def process_email_file(filepath, db, parsers)
                   )
                 end
 
-                puts "Added: #{parsed[:date]} - #{parsed[:merchant]} $#{parsed[:amount]} (#{parser['name']}) - #{parsed[:transaction_type]} - #{parsed[:account]}"
+                puts "Added: #{parsed[:transaction_date]} - #{parsed[:merchant]} $#{parsed[:amount]} (#{parser['name']}) - #{parsed[:transaction_type]} - #{parsed[:account]}"
              else
                puts "Skipped (duplicate): #{parsed[:merchant]} $#{parsed[:amount]}"
              end
