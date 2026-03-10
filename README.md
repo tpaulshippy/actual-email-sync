@@ -1,6 +1,6 @@
 # Actual Email Sync
 
-A free, open-source alternative to Actual Budget's paid bank sync. This project automates transaction entry by parsing email alerts from your banks and feeding them into Actual Budget.
+A free, open-source alternative to Actual Budget's bank sync options. This project automates transaction entry by parsing email alerts from your banks and feeding them into Actual Budget.
 
 ## Overview
 
