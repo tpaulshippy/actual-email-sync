@@ -5,20 +5,14 @@ require 'base64'
 require 'date'
 require 'optparse'
 
-DEFAULT_CONFIG_PATH = File.expand_path('~/repos/finance/email_parsers.json')
 DEFAULT_DB_PATH = File.expand_path('~/repos/finance/spending.db')
 
 options = {
-  config_path: DEFAULT_CONFIG_PATH,
   db_path: DEFAULT_DB_PATH
 }
 
 OptionParser.new do |opts|
   opts.banner = "Usage: #{$0} [options] <email_file>"
-
-  opts.on("-cPATH", "--config=PATH", "Path to config JSON file") do |path|
-    options[:config_path] = path
-  end
 
   opts.on("-dPATH", "--db=PATH", "Path to SQLite database") do |path|
     options[:db_path] = path
@@ -30,7 +24,6 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-CONFIG_PATH = options[:config_path]
 DB_PATH = options[:db_path]
 
 if ARGV.empty?
@@ -40,8 +33,11 @@ end
 
 EMAIL_FILE = ARGV[0]
 
-def load_config
-  JSON.parse(File.read(CONFIG_PATH))
+def load_parsers(db)
+  db.results_as_hash = true
+  db.execute("SELECT * FROM email_parsers").map do |row|
+    row.transform_keys(&:to_sym)
+  end
 end
 
 def init_db
@@ -58,6 +54,22 @@ def init_db
       email_file TEXT,
       transaction_type TEXT DEFAULT 'posted',
       account TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  SQL
+  db.execute(<<-SQL)
+    CREATE TABLE IF NOT EXISTS email_parsers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      from_pattern TEXT,
+      subject_pattern TEXT,
+      merchant_pattern TEXT,
+      amount_pattern TEXT,
+      card_pattern TEXT,
+      account_pattern TEXT,
+      transaction_type TEXT DEFAULT 'posted',
+      account TEXT,
+      is_spending INTEGER DEFAULT 1,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   SQL
@@ -98,7 +110,7 @@ def parse_email(body, parser)
   end
 
   if amount && merchant
-    amount = parser['is_spending'] ? -amount : amount
+    amount = parser[:is_spending].to_i == 1 ? -amount : amount
     {
       amount: amount,
       merchant: merchant,
@@ -160,6 +172,6 @@ def process_email_file(filepath, db, parsers)
     end
 end
 
-parsers = load_config
-db = init_db
+parsers = load_parsers(db)
+db.results_as_hash = false
 process_email_file(EMAIL_FILE, db, parsers)
