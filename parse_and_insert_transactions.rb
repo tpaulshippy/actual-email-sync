@@ -112,7 +112,7 @@ def parse_email(body, parser)
 
   if parser[:amount_pattern]
     match = decoded_body.match(/#{parser[:amount_pattern]}/)
-    amount = match[1].to_f if match
+    amount = match[1].gsub(',', '').to_f if match
   end
 
   if parser[:merchant_pattern]
@@ -181,7 +181,7 @@ def process_email_file(filepath, db, parsers)
           parsed = parse_email(body, parser)
           if parsed
             existing = db.get_first_row(
-              'SELECT 1 FROM transactions WHERE date = ? AND merchant = ? AND amount = ?',
+              'SELECT 1 FROM transactions WHERE transaction_date = ? AND merchant = ? AND amount = ?',
               [parsed[:transaction_date], parsed[:merchant], parsed[:amount]]
             )
 
@@ -206,7 +206,7 @@ def process_email_file(filepath, db, parsers)
                 end
 
                 db.execute(
-                  'INSERT INTO transactions (date, merchant, amount, card_last_four, source, email_subject, email_file, transaction_type, account, matched_auth_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  'INSERT INTO transactions (transaction_date, merchant, amount, card_last_four, source, email_subject, email_file, transaction_type, account, matched_auth_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                   [parsed[:transaction_date], parsed[:merchant], parsed[:amount], parsed[:card_last_four], parser['name'], subject, File.basename(filepath), parsed[:transaction_type], parsed[:account], matched_auth_id]
                 )
                 
