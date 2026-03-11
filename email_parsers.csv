@@ -1,4 +1,4 @@
 id,name,from_pattern,subject_pattern,merchant_pattern,amount_pattern,card_pattern,account_pattern,transaction_type,account,is_spending,created_at,date_pattern,matches_auth_on_card
-1,fidelity_card,fidelityealerts,"charge was authorized",charged\s*$\d+\.\d+\s*at\s+(.+?)\.,$(\d+\.\d+),ending\s*in\s*(\d{4}),,authorization,36990e5f-dcbb-4b2a-949a-b0c3a0335a41,1,"2026-03-10 04:29:56",,0
-2,fidelity_direct_debit,fidelity.alerts@fidelity.com,"Direct Debit Withdrawal",by\s+(.+?)(?:\s*\(|$),"amount of \$(\d+[,\d]*\.\d+)",,"account ending in\s+(\d{4})",withdrawal,017034fc-da90-4ac9-acd3-19f43c134142,1,"2026-03-10 04:29:56",,0
-3,fidelity_card_posted,fidelityealerts,"credit card debit posted",,"A debit of \$(\d+\.\d+)","ending in (\d{4})",,withdrawal,36990e5f-dcbb-4b2a-949a-b0c3a0335a41,1,"2026-03-10 13:07:32","on (\d{2}/\d{2}/\d{4})",1
+1,fidelity_card,fidelityealerts,"charge was authorized",charged\s*\$\d+\.\d+\s*at\s+(.+?)\.,\\$(\d+\.\d+),ending\s*in\s*(\d{4}),,authorization,36990e5f-dcbb-4b2a-949a-b0c3a0335a41,1,"2026-03-10 04:29:56",,0
+3,fidelity_card_posted,fidelityealerts,"credit card debit posted",,"A debit of \\$(\d+\.\d+)","ending in (\d{4})",,withdrawal,36990e5f-dcbb-4b2a-949a-b0c3a0335a41,1,"2026-03-10 13:07:32","on (\d{2}/\d{2}/\d{4})",1
+4,fidelity_direct_debit,fidelity.alerts@fidelity.com,"Direct Debit Withdrawal",by\s+(.+?)(?:\s*\(|$),"amount of \\$(\d+[,\d]*\.\d+)",,"account ending in\s+(\d{4})",withdrawal,017034fc-da90-4ac9-acd3-19f43c134142,1,"2026-03-11 14:25:41",,0
