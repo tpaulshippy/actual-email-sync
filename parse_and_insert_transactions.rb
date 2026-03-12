@@ -4,6 +4,7 @@ require 'sqlite3'
 require 'base64'
 require 'date'
 require 'optparse'
+require_relative 'lib/parser_module'
 
 DEFAULT_DB_PATH = File.expand_path('~/repos/finance/spending.db')
 
@@ -26,19 +27,14 @@ end.parse!
 
 DB_PATH = options[:db_path]
 
+include ParserModule
+
 if ARGV.empty?
   puts "Error: Email file path required as argument"
   exit 1
 end
 
 EMAIL_FILE = ARGV[0]
-
-def load_parsers(db)
-  db.results_as_hash = true
-  db.execute("SELECT * FROM email_parsers").map do |row|
-    row.transform_keys(&:to_sym)
-  end
-end
 
 def init_db
   db = SQLite3::Database.new(DB_PATH)
@@ -93,76 +89,6 @@ def init_db
   db
 end
 
-def parse_email(body, parser)
-  return nil if body.nil? || body.empty?
-
-  decoded_body = nil
-  begin
-    padding = body.length % 4
-    decoded_body = Base64.urlsafe_decode64(body)
-  rescue
-    return nil
-  end
-
-  return nil if decoded_body.nil?
-
-  amount = nil
-  merchant = nil
-  card_last_four = nil
-  transaction_date = nil
-
-  if parser[:amount_pattern]
-    match = decoded_body.match(/#{parser[:amount_pattern]}/)
-    amount = match[1].gsub(',', '').to_f if match
-  end
-
-  if parser[:merchant_pattern]
-    match = decoded_body.match(/#{parser[:merchant_pattern]}/)
-    merchant = match[1].strip if match
-    merchant = merchant.gsub('&apos;', "'") if merchant
-  end
-
-  if parser[:card_pattern]
-    match = decoded_body.match(/#{parser[:card_pattern]}/)
-    card_last_four = match[1] if match
-  end
-
-  if parser[:date_pattern]
-    match = decoded_body.match(/#{parser[:date_pattern]}/)
-    if match
-      date_str = match[1]
-      mm, dd, yyyy = date_str.split('/')
-      transaction_date = "#{yyyy}-#{mm}-#{dd}"
-    end
-  end
-
-  transaction_date ||= Date.today.strftime('%Y-%m-%d')
-
-  if amount && (merchant || parser[:transaction_type] == 'withdrawal')
-    amount = parser[:is_spending].to_i == 1 ? -amount : amount
-    {
-      amount: amount,
-      merchant: merchant || 'Unknown',
-      card_last_four: card_last_four,
-      transaction_date: transaction_date,
-      transaction_type: parser[:transaction_type] || 'posted',
-      account: parser[:account]
-    }
-  else
-    nil
-  end
-end
-
-def matches_criteria?(from_val, subject, parser)
-  from_val = from_val&.downcase || ''
-  subject = subject&.downcase || ''
-
-  from_match = parser['from_pattern'].nil? || from_val.include?(parser['from_pattern'].downcase)
-  subject_match = parser['subject_pattern'].nil? || subject.include?(parser['subject_pattern'].downcase)
-
-  from_match && subject_match
-end
-
 def process_email_file(filepath, db, parsers)
   file_content = File.read(filepath)
   data = JSON.parse(file_content)
@@ -189,7 +115,7 @@ def process_email_file(filepath, db, parsers)
              if existing.nil?
                 matched_auth_id = nil
                 unmatched_reason = nil
-                if parser['matches_auth_on_card'] == 1 && parsed[:card_last_four]
+                if parser[:matches_auth_on_card] == 1 && parsed[:card_last_four]
                   auth_match = db.get_first_row(
                     'SELECT id, merchant FROM transactions WHERE transaction_type = ? AND amount = ? AND card_last_four = ? AND matched_posted_id IS NULL ORDER BY transaction_date DESC, id DESC LIMIT 1',
                     ['authorization', parsed[:amount], parsed[:card_last_four]]
@@ -208,7 +134,7 @@ def process_email_file(filepath, db, parsers)
 
                 db.execute(
                   'INSERT INTO transactions (transaction_date, merchant, amount, card_last_four, source, email_subject, email_file, transaction_type, account, matched_auth_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  [parsed[:transaction_date], parsed[:merchant], parsed[:amount], parsed[:card_last_four], parser['name'], subject, File.basename(filepath), parsed[:transaction_type], parsed[:account], matched_auth_id]
+                  [parsed[:transaction_date], parsed[:merchant], parsed[:amount], parsed[:card_last_four], parser[:name], subject, File.basename(filepath), parsed[:transaction_type], parsed[:account], matched_auth_id]
                 )
                 
                 if unmatched_reason
@@ -219,7 +145,7 @@ def process_email_file(filepath, db, parsers)
                   )
                 end
 
-                puts "Added: #{parsed[:transaction_date]} - #{parsed[:merchant]} $#{parsed[:amount]} (#{parser['name']}) - #{parsed[:transaction_type]} - #{parsed[:account]}"
+                puts "Added: #{parsed[:transaction_date]} - #{parsed[:merchant]} $#{parsed[:amount]} (#{parser[:name]}) - #{parsed[:transaction_type]} - #{parsed[:account]}"
              else
                puts "Skipped (duplicate): #{parsed[:merchant]} $#{parsed[:amount]}"
              end
