@@ -14,8 +14,8 @@ def run_cmd(cmd)
   abort "Command failed: #{err}" unless status.success?
   out
 end
-today = Time.now.strftime('%Y/%m/%d')
-query = "after:#{today}"
+yesterday = (Time.now - 86400).strftime('%Y/%m/%d')
+query = "after:#{yesterday}"
 stdout = run_cmd("gog gmail search '#{query}' -j -a #{ACCOUNT}")
 
 result = JSON.parse(stdout)
