@@ -46,8 +46,8 @@ async function main() {
 
     const existing = actualDb.prepare(`
       SELECT id FROM transactions 
-      WHERE date = ? AND amount = ? AND (description = ? OR imported_description = ?)
-    `).get(dateStr, amountCents, tx.merchant, tx.merchant);
+      WHERE date = ? AND amount = ? AND imported_description = ?
+    `).get(dateStr, amountCents, tx.merchant);
 
     if (existing) {
       console.log(`Skipping duplicate: ${tx.merchant} $${tx.amount} on ${tx.transaction_date}`);
