@@ -42,7 +42,7 @@ async function main() {
     }
 
     const amountCents = Math.round(tx.amount * 100);
-    const dateStr = tx.transaction_date.replace(/-/g, '');
+    const dateStr = String(tx.transaction_date).replace(/-/g, '');
 
     const existing = actualDb.prepare(`
       SELECT id FROM transactions 
