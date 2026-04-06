@@ -29,6 +29,9 @@ async function main() {
     WHERE transaction_type = 'withdrawal' AND actual_posted = 0
   `).all();
 
+  const actualDbPath = './actual-data/My-Finances-f3ca349/db.sqlite';
+  const actualDb = sqlite3(actualDbPath);
+
   console.log(`\nFound ${withdrawals.length} unposted withdrawal(s)`);
 
   for (const tx of withdrawals) {
@@ -39,6 +42,18 @@ async function main() {
     }
 
     const amountCents = Math.round(tx.amount * 100);
+    const dateStr = tx.transaction_date.replace(/-/g, '');
+
+    const existing = actualDb.prepare(`
+      SELECT id FROM transactions 
+      WHERE date = ? AND amount = ? AND (description = ? OR imported_description = ?)
+    `).get(dateStr, amountCents, tx.merchant, tx.merchant);
+
+    if (existing) {
+      console.log(`Skipping duplicate: ${tx.merchant} $${tx.amount} on ${tx.transaction_date}`);
+      db.prepare(`UPDATE transactions SET actual_posted = 1 WHERE id = ?`).run(tx.id);
+      continue;
+    }
 
     try {
       const result = await api.addTransactions(actualAccountId, [{
@@ -56,6 +71,7 @@ async function main() {
   }
 
   db.close();
+  actualDb.close();
   await api.shutdown();
 }
 
