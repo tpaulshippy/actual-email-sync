@@ -3,19 +3,37 @@ require 'net/imap'
 require 'mail'
 require 'json'
 require 'time'
+require 'addressable/uri'
 
-ACCOUNT = ARGV[0] || abort("Usage: #{$0} <account_email>")
+def decode_subject(encoded)
+  return encoded unless encoded
+  Addressable::URI.unencode(encoded.gsub(/=\?([^?]+)\?([BQ])\?([^?]*)\?=/) do
+    charset = $1
+    encoding = $2
+    text = $3
+    case encoding.upcase
+    when 'B'
+      [text].pack('M').unpack('m')[0]
+    when 'Q'
+      text.gsub(/_/, ' ').each_byte.map { |b| b.chr }.join
+    else
+      text
+    end
+  end)
+end
+
+ACCOUNT = ARGV[0] || abort("Usage: #{$0} <account_email> [date]")
 APP_PASSWORD = ENV.fetch('GMAIL_APP_PASSWORD') { abort("Set GMAIL_APP_PASSWORD env var") }
 OUTPUT_DIR = File.expand_path('~/email_logs')
 
-Dir.mkdir(OUTPUT_DIR) unless Dir.exist?(OUTPUT_DIR)
+target_date = ARGV[1] ? Time.parse(ARGV[1]) : (Time.now - 86400)
+yesterday = target_date.strftime('%-d-%b-%Y')
 
 imap = Net::IMAP.new('imap.gmail.com', 993, true)
 imap.login(ACCOUNT, APP_PASSWORD)
 imap.select('INBOX')
 
-yesterday = (Time.now - 86400).strftime('%d-%b-%Y')
-uids = imap.uid_search(["SINCE #{yesterday}"])
+uids = imap.uid_search(['SINCE', yesterday])
 
 uids.each do |uid|
   filepath = File.join(OUTPUT_DIR, "#{uid}.json")
@@ -28,15 +46,24 @@ uids.each do |uid|
   mail = Mail.read_from_string(raw)
   body = mail.text_part&.decoded || mail.body&.decoded
 
-  File.write(filepath, JSON.pretty_generate({
-    'messages' => [{
-      'id' => uid.to_s,
-      'subject' => envelope.subject,
-      'from' => envelope.from&.map { |a| "#{a.mailbox}@#{a.host}" }&.join(', '),
-      'date' => envelope.date,
-      'body' => body
-    }]
-  }))
+  from_header = envelope.from&.map { |a| "#{a.mailbox}@#{a.host}" }&.join(', ')
+  date_header = envelope.date&.to_s
+  subject_header = decode_subject(envelope.subject)
+
+  msg_struct = {
+    'id' => uid.to_s,
+    'body' => body,
+    'payload' => {
+      'body' => body,
+      'headers' => [
+        { 'name' => 'From', 'value' => from_header },
+        { 'name' => 'Subject', 'value' => subject_header },
+        { 'name' => 'Date', 'value' => date_header }
+      ]
+    }
+  }
+
+  File.write(filepath, JSON.pretty_generate({ 'messages' => [msg_struct] }))
 end
 
 imap.logout

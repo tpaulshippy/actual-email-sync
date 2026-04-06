@@ -12,15 +12,15 @@ module ParserModule
   def parse_email(body, parser)
     return nil if body.nil? || body.empty?
 
-    decoded_body = nil
+    decoded_body = body
     begin
       padding = body.length % 4
       decoded_body = Base64.urlsafe_decode64(body)
     rescue
-      return nil
+      decoded_body = body
     end
 
-    return nil if decoded_body.nil?
+    return nil if decoded_body.nil? || decoded_body.empty?
 
     amount = nil
     merchant = nil
