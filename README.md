@@ -272,6 +272,20 @@ category_confidence / categorized_at / category_probabilities` columns to
 `api.addTransactions`. Run `ruby test_jev_categorizer.rb` for the
 Jev categorizer tests.
 
+#### Backfilling transactions already in Actual
+
+`categorize_transactions.rb` only scores the staging DB, so transactions
+already posted to Actual stay uncategorized. To fix those, score them from
+the Actual budget and apply via the API (direct SQL edits to `db.sqlite`
+would not sync to the server):
+
+```bash
+bundle exec ruby backfill_actual_categories.rb --dry-run --limit 5
+bundle exec ruby backfill_actual_categories.rb --min-confidence 0.6
+node apply_actual_categories.js actual_jev_results.json --dry-run
+node apply_actual_categories.js actual_jev_results.json
+```
+
 ### CI, tests, and linting
 
 GitHub Actions (`.github/workflows/ci.yml`) runs three jobs on every push
