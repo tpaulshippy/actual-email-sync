@@ -51,7 +51,7 @@ async function main() {
 
     if (existing) {
       console.log(`Skipping duplicate: ${tx.merchant} $${tx.amount} on ${tx.transaction_date}`);
-      db.prepare(`UPDATE transactions SET actual_posted = 1 WHERE id = ?`).run(tx.id);
+      db.prepare('UPDATE transactions SET actual_posted = 1 WHERE id = ?').run(tx.id);
       continue;
     }
 
@@ -70,7 +70,7 @@ async function main() {
       }
       const result = await api.addTransactions(actualAccountId, [txn]);
 
-      db.prepare(`UPDATE transactions SET actual_posted = 1 WHERE id = ?`).run(tx.id);
+      db.prepare('UPDATE transactions SET actual_posted = 1 WHERE id = ?').run(tx.id);
       console.log(`Posted: ${tx.date} - ${tx.merchant} $${tx.amount} -> ${tx.category_name || 'uncategorized'} (Actual ID: ${result[0]})`);
     } catch (err) {
       console.error(`Failed to post ${tx.merchant}:`, err.message);

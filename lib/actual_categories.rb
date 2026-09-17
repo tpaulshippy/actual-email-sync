@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'sqlite3'
 
 # Loads budget categories live from the Actual Budget database.
@@ -12,26 +14,44 @@ require 'sqlite3'
 module ActualCategories
   REPO_ROOT = File.expand_path('..', __dir__)
 
+  CATEGORIES_QUERY = <<~SQL
+    SELECT c.id AS id, c.name AS name, c.is_income AS is_income,
+           g.name AS grp
+    FROM categories c
+    LEFT JOIN category_groups g ON g.id = c.cat_group
+    WHERE c.tombstone = 0 AND c.hidden = 0
+    ORDER BY grp, c.name
+  SQL
+
   class << self
     # Find the Actual budget sqlite file.
     # Order: $ACTUAL_BUDGET_DB, $ACTUAL_DATA_DIR/*/db.sqlite,
     #        ./actual-data/*/db.sqlite (repo checkout).
     def budget_db_path(explicit = nil)
-      candidates = []
-      candidates << explicit if explicit
-      candidates << ENV['ACTUAL_BUDGET_DB'] if ENV['ACTUAL_BUDGET_DB']
-      if ENV['ACTUAL_DATA_DIR']
-        candidates.concat(Dir.glob(File.join(ENV['ACTUAL_DATA_DIR'], '*/db.sqlite')))
-        candidates.concat(Dir.glob(File.join(ENV['ACTUAL_DATA_DIR'], 'db.sqlite')))
-      end
-      candidates.concat(Dir.glob(File.join(REPO_ROOT, 'actual-data', '*/db.sqlite')))
-      candidates.concat(Dir.glob(File.join(REPO_ROOT, 'actual-data', 'db.sqlite')))
+      candidates = candidate_paths(explicit)
       path = candidates.find { |p| p && File.file?(p) }
       return path if path
 
-      raise "No Actual budget database found. Set ACTUAL_BUDGET_DB to your " \
-            "Actual db.sqlite (e.g. ./actual-data/My-Finances-*/db.sqlite). " \
+      raise 'No Actual budget database found. Set ACTUAL_BUDGET_DB to your ' \
+            'Actual db.sqlite (e.g. ./actual-data/My-Finances-*/db.sqlite). ' \
             "Checked: #{candidates.uniq.inspect}"
+    end
+
+    def candidate_paths(explicit)
+      candidates = []
+      candidates << explicit if explicit
+      candidates << ENV['ACTUAL_BUDGET_DB'] if ENV['ACTUAL_BUDGET_DB']
+      candidates.concat(env_data_dir_paths)
+      candidates.concat(Dir.glob(File.join(REPO_ROOT, 'actual-data', '*/db.sqlite')))
+      candidates.concat(Dir.glob(File.join(REPO_ROOT, 'actual-data', 'db.sqlite')))
+      candidates
+    end
+
+    def env_data_dir_paths
+      return [] unless ENV['ACTUAL_DATA_DIR']
+
+      Dir.glob(File.join(ENV['ACTUAL_DATA_DIR'], '*/db.sqlite')) +
+        Dir.glob(File.join(ENV['ACTUAL_DATA_DIR'], 'db.sqlite'))
     end
 
     # Load visible, non-deleted categories from Actual, ordered by group/name.
@@ -40,22 +60,7 @@ module ActualCategories
       path = budget_db_path(db_path)
       db = SQLite3::Database.new(path, readonly: true)
       db.results_as_hash = true
-      rows = db.execute(<<~SQL)
-        SELECT c.id AS id, c.name AS name, c.is_income AS is_income,
-               g.name AS grp
-        FROM categories c
-        LEFT JOIN category_groups g ON g.id = c.cat_group
-        WHERE c.tombstone = 0 AND c.hidden = 0
-        ORDER BY grp, c.name
-      SQL
-      rows.map do |r|
-        {
-          id: r['id'],
-          name: r['name'],
-          group: r['grp'],
-          is_income: r['is_income'].to_i == 1
-        }
-      end
+      db.execute(CATEGORIES_QUERY).map { |row| row_to_category(row) }
     ensure
       db&.close
     end
@@ -63,6 +68,15 @@ module ActualCategories
     # Spending categories only (the usual target for email transactions).
     def spending(db_path: nil)
       load(db_path: db_path).reject { |c| c[:is_income] }
+    end
+
+    def row_to_category(row)
+      {
+        id: row['id'],
+        name: row['name'],
+        group: row['grp'],
+        is_income: row['is_income'].to_i == 1
+      }
     end
 
     # Build a Jev Choice `criteria` map from live categories.
@@ -83,8 +97,10 @@ module ActualCategories
     # Map a Jev `choice` string back to the category record.
     def find_by_choice(categories, choice)
       return nil if choice.nil?
+
       exact = categories.find { |c| c[:name] == choice }
       return exact if exact
+
       # Disambiguated "Group > Name" form.
       if choice.include?(' > ')
         group, name = choice.split(' > ', 2)

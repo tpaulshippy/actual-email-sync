@@ -272,6 +272,28 @@ category_confidence / categorized_at / category_probabilities` columns to
 `api.addTransactions`. Run `ruby test_jev_categorizer.rb` for the
 Jev categorizer tests.
 
+### CI, tests, and linting
+
+GitHub Actions (`.github/workflows/ci.yml`) runs three jobs on every push
+and pull request: Minitest suites, RuboCop, and ESLint.
+
+```bash
+bundle install
+bundle exec ruby test_parsers.rb
+bundle exec ruby test_jev_categorizer.rb
+bundle exec rubocop
+npm ci && npm run lint
+```
+
+Notes:
+
+- `actual-data/` is gitignored, so CI has no live Actual budget. Tests that
+  need the real DB skip gracefully; `TestActualCategoriesFixture` builds a
+  miniature Actual-shaped DB in a tmpdir so the same load path is always
+  covered.
+- If bundler tries to write to the system gem dir, run installs with
+  `GEM_HOME=~/.gem/ruby/3.2.0 bundle install`.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

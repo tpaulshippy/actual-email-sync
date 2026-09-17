@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
+
 # Categorize staged email transactions into Actual Budget categories with Jev.
 #
 # Categories always come from the live Actual system (ActualCategories.load),
@@ -28,24 +30,35 @@ options = {
 }
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: #{$0} [options]"
+  opts.banner = 'Usage: categorize_transactions.rb [options]'
   opts.on('-dPATH', '--db=PATH', 'Staging DB path') { |v| options[:db_path] = v }
   opts.on('--actual-db=PATH', 'Actual budget db.sqlite path') { |v| options[:actual_db] = v }
   opts.on('--limit=N', Integer, 'Max transactions to categorize') { |v| options[:limit] = v }
   opts.on('--dry-run', 'Score with Jev but do not write to DB') { options[:dry_run] = true }
-  opts.on('--min-confidence=F', Float, 'Skip assignments below this Jev confidence (default 0)') { |v| options[:min_confidence] = v }
+  opts.on('--min-confidence=F', Float, 'Skip assignments below this Jev confidence (default 0)') do |v|
+    options[:min_confidence] = v
+  end
   opts.on('--model=NAME', 'Jev model (default jev-latest)') { |v| options[:model] = v }
   opts.on('--recategorize', 'Also re-score already-categorized rows') { options[:recategorize] = true }
-  opts.on('-h', '--help') { puts opts; exit }
+  opts.on('-h', '--help') do
+    puts opts
+    exit
+  end
 end.parse!
+
+CATEGORY_COLUMNS = {
+  'category_id' => 'TEXT',
+  'category_name' => 'TEXT',
+  'category_confidence' => 'REAL',
+  'categorized_at' => 'TEXT',
+  'category_probabilities' => 'TEXT'
+}.freeze
 
 def ensure_category_columns(db)
   cols = db.execute('PRAGMA table_info(transactions)').map { |r| r['COLNAME'] || r['name'] }
-  db.execute('ALTER TABLE transactions ADD COLUMN category_id TEXT') unless cols.include?('category_id')
-  db.execute('ALTER TABLE transactions ADD COLUMN category_name TEXT') unless cols.include?('category_name')
-  db.execute('ALTER TABLE transactions ADD COLUMN category_confidence REAL') unless cols.include?('category_confidence')
-  db.execute('ALTER TABLE transactions ADD COLUMN categorized_at TEXT') unless cols.include?('categorized_at')
-  db.execute('ALTER TABLE transactions ADD COLUMN category_probabilities TEXT') unless cols.include?('category_probabilities')
+  CATEGORY_COLUMNS.each do |name, type|
+    db.execute("ALTER TABLE transactions ADD COLUMN #{name} #{type}") unless cols.include?(name)
+  end
 end
 
 begin
@@ -54,9 +67,7 @@ rescue StandardError => e
   abort "Failed to load categories from Actual: #{e.message}"
 end
 
-if categories.empty?
-  abort 'No spending categories found in Actual. Create categories in Actual Budget first.'
-end
+abort 'No spending categories found in Actual. Create categories in Actual Budget first.' if categories.empty?
 
 puts "Loaded #{categories.length} live Actual categories " \
      "(#{categories.map { |c| c[:name] }.sort.first(5).join(', ')}...)"
@@ -89,7 +100,7 @@ rows.each do |tx|
   end
 
   label = result[:category_name] || "UNCATEGORIZED (jev said #{result[:choice].inspect})"
-  puts format('  #%<id>d %<merchant>s %<amount>.2f -> %<label>s (conf %.2f)',
+  puts format('  #%<id>d %<merchant>s %<amount>.2f -> %<label>s (conf %<confidence>.2f)',
               id: tx['id'], merchant: tx['merchant'], amount: tx['amount'].to_f,
               label: label, confidence: result[:confidence])
 

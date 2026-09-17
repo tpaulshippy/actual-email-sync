@@ -1,5 +1,6 @@
-require_relative 'actual_categories'
+# frozen_string_literal: true
 
+require_relative 'actual_categories'
 # Categorizes email transactions into Actual Budget categories using
 # TypeSafe's Jev (a System One model) via the ruby_llm-typesafe provider.
 #
@@ -20,7 +21,7 @@ require_relative 'actual_categories'
 # Requires TYPESAFE_API_KEY. See ruby_llm-typesafe:
 # https://github.com/kieranklaassen/ruby_llm-typesafe
 class JevCategorizer
-  DEFAULT_MODEL = 'jev-latest'.freeze
+  DEFAULT_MODEL = 'jev-latest'
   QUESTION_ID = :category
 
   attr_reader :categories, :model, :min_confidence, :criteria
@@ -29,7 +30,10 @@ class JevCategorizer
   # chat_factory: injectable for tests; receives (schema) and must respond to
   #   #ask(state_json) with an object responding to #parsed.
   def initialize(categories:, model: DEFAULT_MODEL, min_confidence: 0.0, chat_factory: nil)
-    raise ArgumentError, 'categories must not be empty (load them from Actual via ActualCategories)' if categories.nil? || categories.empty?
+    if categories.nil? || categories.empty?
+      raise ArgumentError,
+            'categories must not be empty (load them from Actual via ActualCategories)'
+    end
 
     @categories = categories
     @model = model || DEFAULT_MODEL
@@ -46,12 +50,11 @@ class JevCategorizer
   # Build the TypeSafe schema (the request). Requires the provider gem.
   def build_schema
     require 'ruby_llm-typesafe'
-    schema = RubyLLM::Providers::TypeSafe::Schema.new do |s|
+    RubyLLM::Providers::TypeSafe::Schema.new do |s|
       s.choice JevCategorizer::QUESTION_ID,
                instructions: instructions,
                criteria: criteria
     end
-    schema
   end
 
   # Categorize one transaction hash. Returns:
@@ -59,43 +62,52 @@ class JevCategorizer
   # category_id/name are nil when Jev's choice is unknown or confidence is
   # below min_confidence (caller should leave the transaction uncategorized
   # rather than file it wrongly).
-  def categorize_transaction(tx)
-    categorize(state_for(tx))
+  def categorize_transaction(txn)
+    categorize(state_for(txn))
   end
 
   # Categorize a pre-built state (Hash serialized to JSON, or String).
   def categorize(state)
-    response = chat.ask(state_to_json(state))
+    answer = parsed_answer(chat.ask(state_to_json(state)))
+    build_result(answer)
+  end
+
+  # The state sent to Jev: the transaction record as JSON. State (not chat
+  # history) is what System One models decide over, so keep it dense.
+  def state_for(txn)
+    {
+      merchant: txn['merchant'] || txn[:merchant],
+      amount: txn['amount'] || txn[:amount],
+      date: txn['transaction_date'] || txn[:transaction_date],
+      email_subject: txn['email_subject'] || txn[:email_subject],
+      source: txn['source'] || txn[:source]
+    }.compact
+  end
+
+  private
+
+  def parsed_answer(response)
     answer = response.parsed[QUESTION_ID.to_s] || response.parsed[QUESTION_ID]
     raise "Unexpected Jev response shape: #{response.parsed.inspect}" unless answer && answer['choice']
 
+    answer
+  end
+
+  def build_result(answer)
     choice = answer['choice']
     confidence = answer['confidence'].to_f
     probabilities = answer['probabilities'] || {}
     category = ActualCategories.find_by_choice(categories, choice)
-
-    if category.nil? || confidence < min_confidence
-      return { category_id: nil, category_name: nil, choice: choice,
-               confidence: confidence, probabilities: probabilities }
-    end
+    return uncategorized(choice, confidence, probabilities) if category.nil? || confidence < min_confidence
 
     { category_id: category[:id], category_name: category[:name],
       choice: choice, confidence: confidence, probabilities: probabilities }
   end
 
-  # The state sent to Jev: the transaction record as JSON. State (not chat
-  # history) is what System One models decide over, so keep it dense.
-  def state_for(tx)
-    {
-      merchant: tx['merchant'] || tx[:merchant],
-      amount: tx['amount'] || tx[:amount],
-      date: tx['transaction_date'] || tx[:transaction_date],
-      email_subject: tx['email_subject'] || tx[:email_subject],
-      source: tx['source'] || tx[:source]
-    }.compact
+  def uncategorized(choice, confidence, probabilities)
+    { category_id: nil, category_name: nil, choice: choice,
+      confidence: confidence, probabilities: probabilities }
   end
-
-  private
 
   def state_to_json(state)
     state.is_a?(String) ? state : require_json(state)

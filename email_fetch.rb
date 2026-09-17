@@ -1,8 +1,10 @@
 #!/home/linuxbrew/.linuxbrew/bin/ruby
+# frozen_string_literal: true
+
 require 'json'
 require 'open3'
 
-ACCOUNT = ARGV[0] || abort("Usage: #{$0} <account_email>")
+ACCOUNT = ARGV[0] || abort('Usage: email_fetch.rb <account_email>')
 CONFIG = File.expand_path('~/shared_config')
 OUTPUT_DIR = File.expand_path('~/email_logs')
 
@@ -14,7 +16,7 @@ def run_cmd(cmd)
   abort "Command failed: #{err}" unless status.success?
   out
 end
-yesterday = (Time.now - 86400).strftime('%Y/%m/%d')
+yesterday = (Time.now - 86_400).strftime('%Y/%m/%d')
 query = "after:#{yesterday}"
 stdout = run_cmd("gog gmail search '#{query}' -j -a #{ACCOUNT}")
 
@@ -30,12 +32,13 @@ threads.each do |t|
     msg_id = msg['id']
     filepath = File.join(OUTPUT_DIR, "#{msg_id}.json")
     next if File.exist?(filepath)
+
     payload = msg['payload'] || {}
-    body = payload.dig('body','data')
+    body = payload.dig('body', 'data')
     if body.nil? || body.empty?
       parts = payload['parts'] || []
       parts.each do |part|
-        body = part.dig('body','data')
+        body = part.dig('body', 'data')
         break if body && !body.empty?
       end
     end
