@@ -1,0 +1,75 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    base64 (0.3.0)
+    event_stream_parser (1.0.0)
+    faraday (2.14.1)
+      faraday-net_http (>= 2.0, < 3.5)
+      json
+      logger
+    faraday-multipart (1.2.0)
+      multipart-post (~> 2.0)
+    faraday-net_http (3.4.2)
+      net-http (~> 0.5)
+    faraday-retry (2.4.0)
+      faraday (~> 2.0)
+    json (2.21.2)
+    logger (1.7.0)
+    marcel (1.2.1)
+    minitest (5.27.0)
+    multipart-post (2.4.1)
+    net-http (0.9.1)
+      uri (>= 0.11.1)
+    ruby_llm (2.0.0.rc4)
+      base64
+      event_stream_parser (~> 1)
+      faraday (>= 1.10.0)
+      faraday-multipart (>= 1)
+      faraday-net_http (>= 1)
+      faraday-retry (>= 1)
+      json (< 3)
+      marcel (>= 1.0, < 3)
+      schematist (~> 1.1)
+      zeitwerk (~> 2)
+    ruby_llm-typesafe (0.1.0)
+      ruby_llm (>= 2.0.0.rc3, < 3)
+    schematist (1.1.0)
+    sqlite3 (2.9.6-aarch64-linux-gnu)
+    uri (1.1.1)
+    zeitwerk (2.8.3)
+
+PLATFORMS
+  aarch64-linux-gnu
+
+DEPENDENCIES
+  minitest (~> 5.0)
+  ruby_llm (= 2.0.0.rc4)
+  ruby_llm-typesafe (= 0.1.0)
+  sqlite3 (~> 2.0)
+
+CHECKSUMS
+  base64 (0.3.0)
+  bundler (4.0.19) sha256=b48056e4c77fb3853cc47775b5447ede44aaa4f53c32f168014ab4fe86587d47
+  event_stream_parser (1.0.0)
+  faraday (2.14.1)
+  faraday-multipart (1.2.0)
+  faraday-net_http (3.4.2)
+  faraday-retry (2.4.0)
+  json (2.21.2)
+  logger (1.7.0)
+  marcel (1.2.1)
+  minitest (5.27.0)
+  multipart-post (2.4.1)
+  net-http (0.9.1)
+  ruby_llm (2.0.0.rc4)
+  ruby_llm-typesafe (0.1.0)
+  schematist (1.1.0)
+  sqlite3 (2.9.6-aarch64-linux-gnu)
+  uri (1.1.1)
+  zeitwerk (2.8.3)
+
+RUBY VERSION
+  ruby 3.2.3
+
+BUNDLED WITH
+  4.0.19
