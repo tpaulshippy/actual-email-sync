@@ -244,10 +244,69 @@ ruby sync_to_actual.rb
 - [ ] Email polling/scheduling
 
 ### Phase 4: Advanced Features (Backlog)
-- [ ] Transaction categorization suggestions via LLM
+- [x] Transaction categorization via Jev (System One model, TypeSafe)
 - [ ] Duplicate detection across multiple parsers
 - [ ] Parser templates library
 - [ ] Multi-currency support
+
+### Categorizing with Jev (TypeSafe System One)
+
+Staged email transactions are classified into your **live Actual Budget
+categories** using [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev),
+via [ruby_llm-typesafe](https://github.com/kieranklaassen/ruby_llm-typesafe).
+Jev does not generate text: it answers a single `Choice` question whose
+options are built at runtime from `ActualCategories.spending`, so it cannot
+hallucinate a category that is not in your Actual system.
+
+```bash
+bundle install
+export TYPESAFE_API_KEY=...   # from https://console.typesafe.ai
+bundle exec ruby categorize_transactions.rb --dry-run --limit 5
+bundle exec ruby categorize_transactions.rb --min-confidence 0.6
+node post_to_actual.js        # posts with category set when present
+```
+
+`categorize_transactions.rb` adds `category_id / category_name /
+category_confidence / categorized_at / category_probabilities` columns to
+`spending.db` and `post_to_actual.js` forwards `category_id` to
+`api.addTransactions`. Run `ruby test_jev_categorizer.rb` for the
+Jev categorizer tests.
+
+#### Backfilling transactions already in Actual
+
+`categorize_transactions.rb` only scores the staging DB, so transactions
+already posted to Actual stay uncategorized. To fix those, score them from
+the Actual budget and apply via the API (direct SQL edits to `db.sqlite`
+would not sync to the server):
+
+```bash
+bundle exec ruby backfill_actual_categories.rb --dry-run --limit 5
+bundle exec ruby backfill_actual_categories.rb --min-confidence 0.6
+node apply_actual_categories.js actual_jev_results.json --dry-run
+node apply_actual_categories.js actual_jev_results.json
+```
+
+### CI, tests, and linting
+
+GitHub Actions (`.github/workflows/ci.yml`) runs three jobs on every push
+and pull request: Minitest suites, RuboCop, and ESLint.
+
+```bash
+bundle install
+bundle exec ruby test_parsers.rb
+bundle exec ruby test_jev_categorizer.rb
+bundle exec rubocop
+npm ci && npm run lint
+```
+
+Notes:
+
+- `actual-data/` is gitignored, so CI has no live Actual budget. Tests that
+  need the real DB skip gracefully; `TestActualCategoriesFixture` builds a
+  miniature Actual-shaped DB in a tmpdir so the same load path is always
+  covered.
+- If bundler tries to write to the system gem dir, run installs with
+  `GEM_HOME=~/.gem/ruby/3.2.0 bundle install`.
 
 ## Contributing
 

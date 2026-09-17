@@ -51,20 +51,27 @@ async function main() {
 
     if (existing) {
       console.log(`Skipping duplicate: ${tx.merchant} $${tx.amount} on ${tx.transaction_date}`);
-      db.prepare(`UPDATE transactions SET actual_posted = 1 WHERE id = ?`).run(tx.id);
+      db.prepare('UPDATE transactions SET actual_posted = 1 WHERE id = ?').run(tx.id);
       continue;
     }
 
     try {
-      const result = await api.addTransactions(actualAccountId, [{
+      const txn = {
         date: String(tx.transaction_date),
         amount: amountCents,
         payee_name: '' + tx.merchant,
-        notes: `Source: ${tx.source} (${tx.email_subject})`,
-      }]);
+        notes: `Source: ${tx.source} (${tx.email_subject})` +
+          (tx.category_name ? ` [Jev: ${tx.category_name} ${(tx.category_confidence || 0).toFixed(2)}]` : ''),
+      };
+      // Category comes from Jev (categorize_transactions.rb), resolved against
+      // live Actual categories. Only set when present so Actual rules still apply otherwise.
+      if (tx.category_id) {
+        txn.category = tx.category_id;
+      }
+      const result = await api.addTransactions(actualAccountId, [txn]);
 
-      db.prepare(`UPDATE transactions SET actual_posted = 1 WHERE id = ?`).run(tx.id);
-      console.log(`Posted: ${tx.date} - ${tx.merchant} $${tx.amount} (Actual ID: ${result[0]})`);
+      db.prepare('UPDATE transactions SET actual_posted = 1 WHERE id = ?').run(tx.id);
+      console.log(`Posted: ${tx.date} - ${tx.merchant} $${tx.amount} -> ${tx.category_name || 'uncategorized'} (Actual ID: ${result[0]})`);
     } catch (err) {
       console.error(`Failed to post ${tx.merchant}:`, err.message);
     }
