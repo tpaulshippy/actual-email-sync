@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'date'
 require_relative 'actual_categories'
 # Categorizes email transactions into Actual Budget categories using
 # TypeSafe's Jev (a System One model) via the ruby_llm-typesafe provider.
@@ -44,7 +45,8 @@ class JevCategorizer
 
   def instructions
     'Which Actual Budget category best fits this bank transaction? ' \
-      'Classify by the merchant and what was purchased, not by the email wording.'
+      'Classify by the merchant and what was purchased, not by the email wording. ' \
+      'Use day_of_week for day-specific categories (e.g. Thursday dinner, Sunday lunch).'
   end
 
   # Build the TypeSafe schema (the request). Requires the provider gem.
@@ -74,17 +76,42 @@ class JevCategorizer
 
   # The state sent to Jev: the transaction record as JSON. State (not chat
   # history) is what System One models decide over, so keep it dense.
+  # day_of_week is derived from the date so day-specific categories
+  # (Thursday dinner, Sunday lunch) have a signal to decide over; it is
+  # omitted when the date is missing or unparseable.
   def state_for(txn)
+    raw_date = txn_date(txn)
     {
       merchant: txn['merchant'] || txn[:merchant],
       amount: txn['amount'] || txn[:amount],
-      date: txn['transaction_date'] || txn[:transaction_date],
+      date: raw_date,
+      day_of_week: day_of_week_for(raw_date),
       email_subject: txn['email_subject'] || txn[:email_subject],
       source: txn['source'] || txn[:source]
     }.compact
   end
 
   private
+
+  def txn_date(txn)
+    txn['transaction_date'] || txn[:transaction_date] || txn['date'] || txn[:date]
+  end
+
+  # Full weekday name ("Friday") from an ISO ("2026-09-17") or Actual
+  # YYYYMMDD ("20260504", Integer or String) date. Nil when unparseable.
+  def day_of_week_for(value)
+    str = value.to_s.strip
+    return nil if str.empty?
+
+    date = if str.match?(/\A\d{8}\z/)
+             Date.strptime(str, '%Y%m%d')
+           else
+             Date.parse(str)
+           end
+    date.strftime('%A')
+  rescue ArgumentError
+    nil
+  end
 
   def parsed_answer(response)
     answer = response.parsed[QUESTION_ID.to_s] || response.parsed[QUESTION_ID]

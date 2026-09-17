@@ -107,6 +107,25 @@ class TestJevCategorizer < Minitest::Test
     assert_equal 'WHOLE FOODS', state['merchant']
   end
 
+  def test_state_includes_day_of_week_for_iso_date
+    c = JevCategorizer.new(categories: sample_categories)
+    state = c.state_for('merchant' => 'CHIPOTLE 0658', 'transaction_date' => '2026-09-17')
+    assert_equal 'Thursday', state[:day_of_week]
+  end
+
+  def test_state_includes_day_of_week_for_actual_yyyymmdd
+    c = JevCategorizer.new(categories: sample_categories)
+    assert_equal 'Monday', c.state_for('merchant' => 'X', 'transaction_date' => '20260504')[:day_of_week]
+    assert_equal 'Monday', c.state_for('merchant' => 'X', 'transaction_date' => 20_260_504)[:day_of_week]
+  end
+
+  def test_state_omits_day_of_week_when_date_unusable
+    c = JevCategorizer.new(categories: sample_categories)
+    assert_nil c.state_for('merchant' => 'X')['day_of_week']
+    refute_includes c.state_for('merchant' => 'X', 'transaction_date' => 'not a date'),
+                    :day_of_week
+  end
+
   def test_low_confidence_leaves_uncategorized
     fake = FakeChat.new({ 'category' => { 'choice' => 'Gas',
                                           'confidence' => 0.3,
