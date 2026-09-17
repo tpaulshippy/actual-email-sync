@@ -79,7 +79,10 @@ module ParserModule
   end
 
   def extract_merchant(text, pattern)
-    raw = extract_first_match(text, pattern)
+    return if pattern.nil? || pattern.empty?
+
+    match = text.match(/#{pattern}/)
+    raw = match && match.captures.compact.first
     return if raw.nil?
 
     raw.strip.gsub('&apos;', "'")

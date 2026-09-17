@@ -119,6 +119,66 @@ class TestParseEmail < Minitest::Test
 
     assert_equal '6730', result[:card_last_four]
   end
+
+  def test_parse_email_takes_first_present_merchant_capture
+    parser = {
+      merchant_pattern: 'To\\s+(.+?)\\s+Amount|by\\s+([^.<]+?)\\.',
+      amount_pattern: '\\$(\\d+[\\d,]*\\.\\d+)',
+      transaction_type: 'withdrawal',
+      is_spending: 1
+    }
+
+    result = parse_email('invoice $10.00 by LENDINGCLUB BANK.', parser)
+    assert_equal 'LENDINGCLUB BANK', result[:merchant]
+  end
+
+  DIRECT_DEBIT_QP_HTML = 'For account ending in 9082:<br><br>=' \
+    "\n=0AMoney was withdrawn from your account through a direct debit in the amo=" \
+    "\nunt of $8,000.00 by LENDINGCLUB BANK.=0A=0A<br><br>=0AIf you authorized thi=" \
+    "\ns transaction, no action is needed."
+
+  DIRECT_DEBIT_PLAIN = 'account ending in 9082 To GILBERT AZ Amount $176.96 ' \
+    'Date and time Jul-08-2026. If you authorized this withdrawal, you don\'t need ' \
+    'to do anything. To verify this email was sent by Fidelity Investments, log in.'
+
+  def direct_debit_parser
+    {
+      merchant_pattern: 'To\\s+(.+?)\\s+Amount|by\\s+([^.<]+?)\\.',
+      amount_pattern: '\\$(\\d+[\\d,]*\\.\\d+)',
+      transaction_type: 'withdrawal',
+      is_spending: 1
+    }
+  end
+
+  def test_direct_debit_quoted_printable_html_format
+    result = parse_email(DIRECT_DEBIT_QP_HTML, direct_debit_parser)
+
+    assert_equal 'LENDINGCLUB BANK', result[:merchant]
+    assert_equal(-8000.0, result[:amount])
+  end
+
+  def test_direct_debit_plain_format
+    result = parse_email(DIRECT_DEBIT_PLAIN, direct_debit_parser)
+
+    assert_equal 'GILBERT AZ', result[:merchant]
+    assert_equal(-176.96, result[:amount])
+  end
+
+  def test_card_posted_without_merchant_stays_unknown
+    body = 'A debit of $23.61 has been posted to your account on 03/09/2026. ' \
+      'To view your account, login to your credit card account at Fidelity.com.'
+    parser = {
+      merchant_pattern: nil,
+      amount_pattern: 'A debit of \\$([\\d,]+\\.\\d+)',
+      transaction_type: 'withdrawal',
+      is_spending: 1
+    }
+
+    result = parse_email(body, parser)
+
+    assert_equal 'Unknown', result[:merchant]
+    assert_equal(-23.61, result[:amount])
+  end
 end
 
 class TestAuthMatchingCondition < Minitest::Test
